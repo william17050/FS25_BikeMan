@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8" standalone="no" ?>
+<modDesc descVersion="106">
+    <author>Bill</author>
+    <version>0.3.0.0</version>
+    <title>
+        <en>BikeMan</en>
+    </title>
+    <description>
+        <en><![CDATA[BikeMan (Bike Manager) lets a Bluetooth smart exercise bike drive Farming Simulator 25.
+
+Pedal and the vehicle you are driving follows your speed. The slope you are on becomes the bike's resistance, so hills feel like hills. Stop pedalling and the vehicle freewheels, then the handbrake holds it on slopes until you pedal again. A panel above the speedometer shows watts, cadence, speed, grade and trip distance.
+
+THIS MOD NEEDS A FREE COMPANION APP running on your PC that talks to the bike over Bluetooth. Without it the mod does nothing and the game plays normally. Download the companion app and read the setup guide on the BikeMan project page.
+
+Works with any vehicle (bikes, tractors, with implements attached the game's own speed limits still apply). Single player only. Tested with a Renpho RQ002; other bikes that use the standard FTMS protocol may work but are untested.
+
+Unofficial: not affiliated with GIANTS Software or any bike maker.]]></en>
+    </description>
+    <iconFilename>icon_BikeMan.dds</iconFilename>
+    <multiplayer supported="false"/>
+    <extraSourceFiles>
+        <sourceFile filename="BikeMan.lua" />
+    </extraSourceFiles>
+</modDesc>
