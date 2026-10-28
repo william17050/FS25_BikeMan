@@ -2,6 +2,10 @@
 
 Pedal a Bluetooth smart bike (FTMS) and drive a vehicle in FS25 with it. Your cadence and speed move the vehicle. The slope the vehicle is on is sent back to the bike as resistance. An in-game panel shows your live bike stats.
 
+![The real setup: a Renpho bike in front of three monitors, with FS25 and the BikeMan panel on the middle screen](docs/images/setup-wide.jpg)
+
+*The real thing: a Renpho RQ002 bike, a keyboard on the handlebars, and FS25 on the middle screen.*
+
 ![BikeMan panel on the in-game bike: 20 W, 79 rpm, PEDALLING, 14 mph](docs/images/bike-on-road.jpg)
 
 *The BikeMan panel above the speedometer: watts, cadence, state, grade, speed, energy and trip distance.*
@@ -43,6 +47,10 @@ BikeMan sends resistance commands to your exercise bike. Keep the resistance cap
 | `find_bike.py` | Lists nearby Bluetooth devices so you can find your bike's address. |
 
 Nothing here talks to the internet. The only network use is the localhost link between the two scripts.
+
+![The bike's console and the game screen side by side](docs/images/setup-bike.jpg)
+
+*The bike on its own Bluetooth link; the game sees only the files the two scripts exchange.*
 
 ---
 
