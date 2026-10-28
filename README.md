@@ -2,6 +2,17 @@
 
 Pedal a Bluetooth smart bike (FTMS) and drive a vehicle in FS25 with it. Your cadence and speed move the vehicle. The slope the vehicle is on is sent back to the bike as resistance. An in-game panel shows your live bike stats.
 
+![BikeMan panel on the in-game bike: 20 W, 79 rpm, PEDALLING, 14 mph](docs/images/bike-on-road.jpg)
+
+*The BikeMan panel above the speedometer: watts, cadence, state, grade, speed, energy and trip distance.*
+
+<p>
+<img src="docs/images/tractor-plowing.jpg" width="49%" alt="Plowing a field with a tractor, driven by pedalling">
+<img src="docs/images/bike-pedalling.jpg" width="49%" alt="Riding the mountain bike on a road">
+</p>
+
+*Left: plowing with a tractor at 7 mph on pedal power. Right: out on the road.*
+
 **Unofficial.** Not affiliated with GIANTS Software, Renpho or any other company. Developed and tested with a Renpho RQ002 and the free **Lizard Mountain Bike** mod. Works on **Windows** and **Linux** (Steam/Proton). macOS is not supported.
 
 ## Downloads
