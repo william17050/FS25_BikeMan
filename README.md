@@ -21,6 +21,8 @@ Pedal a Bluetooth smart bike (FTMS) and drive a vehicle in FS25 with it. Your ca
 
 ## Downloads
 
+Also available on itch.io: https://william17050.itch.io/bikeman
+
 Two files from the **Releases** page (or build them yourself, see below):
 
 - **`FS25_BikeMan.zip`**: the game mod. Goes in your FS25 `mods` folder. Keep it zipped.
