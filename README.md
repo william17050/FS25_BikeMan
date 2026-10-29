@@ -1,5 +1,7 @@
 # BikeMan: ride a smart bike inside Farming Simulator 25
 
+<p align="center"><img src="docs/images/bikeman-cover.webp" width="630" alt="BikeMan: pedal a real bike in Farming Simulator 25"></p>
+
 Pedal a Bluetooth smart bike (FTMS) and drive a vehicle in FS25 with it. Your cadence and speed move the vehicle. The slope the vehicle is on is sent back to the bike as resistance. An in-game panel shows your live bike stats.
 
 ![The real setup: a Renpho bike in front of three monitors, with FS25 and the BikeMan panel on the middle screen](docs/images/setup-wide.jpg)
