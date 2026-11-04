@@ -82,18 +82,18 @@ Nothing here talks to the internet. The only network use is the localhost link b
 4. **Bike address (optional).** The bridge finds your bike automatically by scanning for a fitness machine. You only need to set the address if you have more than one smart bike or trainer nearby:
    - Wake the bike by pedalling, and close the Renpho app and Zwift.
    - Double-click `windows_find_bike.bat`. Your bike appears with a `*` (it advertises FTMS). Copy its address.
-   - Open `windows_start_bridge.bat` in Notepad and put it in `set "BIKE_ADDR=..."`. Save.
+   - Open `windows_start.bat` in Notepad (and `windows_start_bridge.bat` if you use the two-window way) and put it in `set "BIKE_ADDR=..."`. Save.
 
 ### 3.2 Each ride
 
 1. Close the Renpho app and Zwift. Wake the bike by pedalling.
-2. Double-click **`windows_start_bridge.bat`**. Leave the window open. The first run installs `bleak`. Wait for `Bike connected.`
-3. Start FS25, load your savegame and make sure **BikeMan** and your bike vehicle are enabled for the save.
-4. Get on the bike vehicle.
-5. Double-click **`windows_start_link.bat`**. You should see a line like `game 0.0 km/h  grade -0.6%  target 0.0  bike 0.0 km/h  rpm 0 ...` updating.
-6. Start pedalling.
+2. Start FS25, load your savegame and make sure **BikeMan** and your bike vehicle are enabled for the save. Get on the bike vehicle.
+3. Double-click **`windows_start.bat`**. It starts the bike bridge, waits for `Bike connected.`, then starts the link. The first run installs `bleak`. You should see a line like `game 0.0 km/h  grade -0.6%  target 0.0  bike 0.0 km/h  rpm 0 ...` updating.
+4. Start pedalling.
 
-Stop with Ctrl+C in each window (the link first). When the link stops it removes `in.xml`, and the game takes the vehicle back.
+Stop with Ctrl+C. That stops both programs, and when the link stops it removes `in.xml`, so the game takes the vehicle back. Only one copy of the link can run at a time; a second one refuses to start and tells you so.
+
+Prefer two windows? `windows_start_bridge.bat` and `windows_start_link.bat` still work on their own: start the bridge first, wait for `Bike connected.`, then the link, and stop the link first.
 
 ---
 
@@ -111,27 +111,30 @@ Stop with Ctrl+C in each window (the link first). When the link stops it removes
    ```
    ~/.local/share/Steam/steamapps/compatdata/2300320/pfx/drive_c/users/steamuser/Documents/My Games/FarmingSimulator2025
    ```
-   The scripts look there automatically. **If you use Flatpak Steam, or Steam is installed somewhere else, the scripts will not find it.** In that case set `EXTRA=(--profile "/full/path/to/FarmingSimulator2025")` in `linux_start_link.sh`. The Flatpak location is under `~/.var/app/com.valvesoftware.Steam/`.
+   The scripts look there automatically. **If you use Flatpak Steam, or Steam is installed somewhere else, the scripts will not find it.** In that case set `EXTRA=(--profile "/full/path/to/FarmingSimulator2025")` in `linux_start.sh` (and in `linux_start_link.sh` if you use the two-terminal way). The Flatpak location is under `~/.var/app/com.valvesoftware.Steam/`.
 3. **Copy `FS25_BikeMan.zip` into the `mods` folder inside that profile. Do not unzip it.** Also put the Lizard Mountain Bike zip there. Check `gameSettings.xml` in the profile for an active `modsDirectoryOverride`. If there is one, use that folder.
 4. **Make the scripts runnable:**
    ```bash
-   chmod +x linux_start_bridge.sh linux_start_link.sh find_bike.sh
+   chmod +x linux_start.sh linux_start_bridge.sh linux_start_link.sh find_bike.sh
    ```
 5. **Bike address (optional).** The bridge finds your bike automatically. Set the address only if several smart bikes or trainers are nearby. Wake the bike by pedalling, close the Renpho app, and run:
    ```bash
    ./find_bike.sh
    ```
-   Your bike appears with a `*`. Put its address in `BIKE_ADDR=""` at the top of `linux_start_bridge.sh`.
+   Your bike appears with a `*`. Put its address in `BIKE_ADDR=""` at the top of `linux_start.sh` (and `linux_start_bridge.sh` if you use the two-terminal way).
 
 The first run of `linux_start_bridge.sh` or `find_bike.sh` creates a `.venv` folder next to the scripts and installs `bleak` into it. This avoids touching the system Python, which matters on immutable distros such as Bazzite.
 
 ### 4.2 Each ride
 
 1. Close the Renpho app. Wake the bike by pedalling.
-2. In a terminal: `./linux_start_bridge.sh`. Leave it open and wait for `Bike connected.`
-3. Start FS25 from Steam, load the save, enable **BikeMan** and your bike vehicle, and get on it.
-4. In a second terminal: `./linux_start_link.sh`.
-5. Pedal.
+2. Start FS25 from Steam, load the save, enable **BikeMan** and your bike vehicle, and get on it.
+3. In a terminal: `./linux_start.sh`. It starts the bike bridge, waits for `Bike connected.`, then starts the link.
+4. Pedal.
+
+Stop with Ctrl+C. That stops both programs. Only one copy of the link can run at a time; a second one refuses to start and tells you so. The bridge's own messages go to `rides/bridge_console.log`.
+
+Prefer two terminals? `./linux_start_bridge.sh` and `./linux_start_link.sh` still work on their own: start the bridge first, wait for `Bike connected.`, then the link.
 
 ---
 

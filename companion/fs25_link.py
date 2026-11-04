@@ -108,6 +108,16 @@ def write_in(seq, kph, rpm, watts, grade=0.0, kj=0.0, hud=1.0, units="both", bra
             time.sleep(0.01)
 
 
+def single_instance(port):
+    """Hold the port after the bridge's so a second copy of this script refuses to start (two links would send the bike different grades)."""
+    s = socket.socket()
+    try:
+        s.bind(("127.0.0.1", port + 1))
+    except OSError:
+        raise SystemExit(f"Another fs25_link.py is already running (it holds port {port + 1}). Close it first (Ctrl+C in its window), then start this again.")
+    return s
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=48765)
@@ -125,6 +135,7 @@ def main():
     ap.add_argument("--max-grade", type=float, default=20.0)
     ap.add_argument("--profile", default=None, help="FS25 profile folder if it is not found automatically")
     a = ap.parse_args()
+    lock = single_instance(a.port)         # keep this reference alive for the whole run
     global DIR, OUT, IN
     DIR = os.path.join(find_profile(a.profile), "modSettings", "FS25_BikeMan")
     OUT, IN = os.path.join(DIR, "out.txt"), os.path.join(DIR, "in.xml")
