@@ -9,6 +9,8 @@ FS25 <-> bike link. Run alongside bridge.py (bridge first) while FS25 is running
 Game -> us : modSettings/FS25_BikeMan/out.txt  (speed, body pitch as grade %)
 Us -> game : modSettings/FS25_BikeMan/in.xml   (target km/h; the mod lets go if this stops changing for 2 s)
 Us -> bike : {"grade": pct} to the bridge on 127.0.0.1:48765
+Handlebar controller (bridge.py --obc): steering and braking go to in.xml (steer, lever); Shift Up / Down change
+--grade-scale by 0.1 for this run; Lap zeroes the trip distance. Braking stops the bike from driving the vehicle.
 Grade source is body pitch (terrain slope reads wrong on bridges). It is median-filtered over ~0.5 s,
 clamped to --min-grade..--max-grade, and 0 when you are not in a vehicle.
 Logs: rides/fs25_link_<time>.csv
@@ -50,6 +52,8 @@ class Bridge(threading.Thread):
         self.port, self.sock = port, None
         self.data = None          # last {"type":"data"...}
         self.data_t = 0.0
+        self.obc = {"steer": 0.0, "brake": 0.0}   # handlebar controller, if the bridge has one
+        self.actions = deque()                    # its button presses, oldest first
         self.lock = threading.Lock()
 
     def run(self):
@@ -67,10 +71,32 @@ class Bridge(threading.Thread):
                     if m.get("type") == "data":
                         with self.lock:
                             self.data, self.data_t = m, time.time()
+                    elif m.get("type") == "obc":
+                        self.on_obc(m)
             except OSError:
                 pass
             self.sock = None
+            with self.lock:
+                self.obc = {"steer": 0.0, "brake": 0.0}
             time.sleep(1.0)
+
+    def on_obc(self, m):
+        with self.lock:
+            if m.get("action") in ("grade_up", "grade_down", "trip_reset"):
+                self.actions.append(m["action"])
+            if "steer" in m or "brake" in m:
+                try:
+                    self.obc = {"steer": max(-1.0, min(1.0, float(m.get("steer", 0.0)))),
+                                "brake": max(0.0, min(1.0, float(m.get("brake", 0.0))))}
+                except (TypeError, ValueError):
+                    pass
+
+    def controller(self):
+        """(steer, brake, [actions since last call]) from the handlebar controller."""
+        with self.lock:
+            acts = list(self.actions)
+            self.actions.clear()
+            return self.obc["steer"], self.obc["brake"], acts
 
     def send(self, obj):
         s = self.sock
@@ -96,10 +122,10 @@ def read_out():
         return None
 
 
-def write_in(seq, kph, rpm, watts, grade=0.0, kj=0.0, hud=1.0, units="both", brake=0.0, dist=0.0):
+def write_in(seq, kph, rpm, watts, grade=0.0, kj=0.0, hud=1.0, units="both", brake=0.0, dist=0.0, steer=0.0, lever=0.0):
     tmp = IN + ".tmp"
     with open(tmp, "w") as f:
-        f.write(f'<?xml version="1.0" encoding="utf-8"?>\n<in seq="{seq}" kph="{kph:.1f}" rpm="{rpm:.0f}" watts="{watts:.0f}" grade="{grade:.2f}" kj="{kj:.1f}" hud="{hud:.2f}" units="{units}" brake="{brake:.2f}" dist="{dist:.3f}"/>\n')
+        f.write(f'<?xml version="1.0" encoding="utf-8"?>\n<in seq="{seq}" kph="{kph:.1f}" rpm="{rpm:.0f}" watts="{watts:.0f}" grade="{grade:.2f}" kj="{kj:.1f}" hud="{hud:.2f}" units="{units}" brake="{brake:.2f}" dist="{dist:.3f}" steer="{steer:.3f}" lever="{lever:.2f}"/>\n')
     for _ in range(5):             # Windows refuses the swap while the game has in.xml open; retry briefly, else skip this tick
         try:
             os.replace(tmp, IN)
@@ -155,11 +181,19 @@ def main():
     seq, t0 = 0, time.time()
     pedalling, low_since = False, None
     trip_km, last_t, last_reset = 0.0, time.time(), None      # trip distance since this script started (see --distance)
+    grade_scale_max = max(2.0, a.grade_scale)                 # Shift Up on a handlebar controller stops here
     try:
         while True:
             time.sleep(0.1)
             o = read_out()
             d = bridge.latest() if bridge else None
+            steer, lever, acts = bridge.controller() if bridge else (0.0, 0.0, [])
+            for act in acts:                               # handlebar controller buttons
+                if act == "trip_reset":
+                    trip_km = 0.0
+                else:
+                    a.grade_scale = round(max(0.0, min(grade_scale_max, a.grade_scale + (0.1 if act == "grade_up" else -0.1))), 1)
+                print(f"\ncontroller: {act}" + ("" if act == "trip_reset" else f" (grade scale {a.grade_scale:.1f})"))
             # ---- game -> bike: grade ----
             grade = 0.0
             if o and o["in_veh"]:
@@ -196,7 +230,7 @@ def main():
                         pedalling = False
                 else:
                     low_since = None
-                target = min(bike_kph * a.speed_scale, a.max_kph) if pedalling else 0.0
+                target = min(bike_kph * a.speed_scale, a.max_kph) if pedalling and lever <= 0 else 0.0
             else:
                 target = None      # no bike data: do not write; the mod goes stale and lets go
             if a.distance == "game":                       # the vehicle's real speed while you are on it
@@ -208,7 +242,7 @@ def main():
                 trip_km += max(0.0, o["speed"]) * dt / 3600.0
             if target is not None:
                 seq += 1
-                write_in(seq, target, rpm, watts, grade, (d or {}).get("kj", 0.0) or 0.0, a.hud_scale, a.units, 0.0 if grade < -2.0 else a.coast_brake, trip_km)
+                write_in(seq, target, rpm, watts, grade, (d or {}).get("kj", 0.0) or 0.0, a.hud_scale, a.units, 0.0 if grade < -2.0 else a.coast_brake, trip_km, steer, lever)
             row = [round(now - t0, 1), o["speed"] if o else "", o["pitch"] if o else "", round(grade, 2),
                    "" if target is None else round(target, 1), round(bike_kph, 1) if (d or a.fake_kph) else "",
                    round(rpm) if (d or a.fake_kph) else "", watts if (d or a.fake_kph) else "",

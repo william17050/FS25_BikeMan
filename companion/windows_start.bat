@@ -6,11 +6,14 @@ set "BIKE_ADDR="
 set "PORT=48765"
 rem Highest resistance the game may command (hard max 80). Lower = easier.
 set "CAP=50"
+rem OpenBikeControl handlebar controller: auto to find it, or its Bluetooth address / IP:port. Blank = none.
+set "OBC="
 rem Extra options, e.g.  --units mph --hud-scale 1.5 --grade-scale 0.6 --coast-brake 0.7
 set "EXTRA="
 rem ------------------------------------------------------------------------
 set "ARGS=--port %PORT% --cap %CAP%"
 if defined BIKE_ADDR set "ARGS=%ARGS% --addr %BIKE_ADDR%"
+if defined OBC set "ARGS=%ARGS% --obc %OBC%"
 py -m pip install --quiet bleak
 py start_bikeman.py %ARGS% %EXTRA%
 pause

@@ -49,8 +49,9 @@ BikeMan sends resistance commands to your exercise bike. Keep the resistance cap
 | `fs25_link.py` | Reads what the game writes (`out.txt`), tells the bridge the slope, and writes `in.xml` with the target speed and HUD data. Uses only Python's standard library. |
 | `FS25_BikeMan.zip` | The FS25 mod (separate download). **Keep it zipped.** It exchanges small files in `modSettings\FS25_BikeMan\`. |
 | `find_bike.py` | Lists nearby Bluetooth devices so you can find your bike's address. |
+| `obc.py` | Optional: reads an OpenBikeControl handlebar controller for the bridge (steer, brake, hill feel). |
 
-Nothing here talks to the internet. The only network use is the localhost link between the two scripts.
+Nothing here talks to the internet. The only network use is the localhost link between the two scripts (and, if you choose it, a handlebar controller on your own network, see 5.1).
 
 ![The bike's console and the game screen side by side](docs/images/setup-bike.jpg)
 
@@ -148,6 +149,21 @@ Prefer two terminals? `./linux_start_bridge.sh` and `./linux_start_link.sh` stil
 - **Trip distance:** the top right of the in-game panel shows how far you have ridden since you started `fs25_link.py`, in miles, kilometres or both (follows `--units`). By default it works like a real bike computer: your **bike's own speed** is added up while you pedal, and the **vehicle's speed** while you coast, so rolling downhill counts. Use `--distance game` to always use the vehicle's speed instead (this follows `--speed-scale`). It restarts from zero each time you start the link. **To zero it during a ride, press Left Ctrl + Left Shift + O** in the game. The panel briefly shows `TRIP RESET`. The key is fixed in the mod and is not shown in the game's controls menu.
 - **Ride logs:** the bridge writes a CSV of every ride into a `rides` folder next to the scripts. Use `--no-log` to turn it off.
 
+### 5.1 Handlebar controller (optional)
+
+The bridge can also connect a handlebar controller that speaks [OpenBikeControl](https://github.com/OpenBikeControl/openbikecontrol-protocol) (Bluetooth, or over the network for apps such as BikeControl). Set `OBC="auto"` in `linux_start.sh` / `linux_start_bridge.sh`, or `set "OBC=auto"` in `windows_start.bat` / `windows_start_bridge.bat`. The bridge then finds a controller advertising the OpenBikeControl service and prints `Controller connected.` Put a Bluetooth address instead of `auto` to pick one, or `IP:port` for a controller on your network.
+
+| Button | In the game |
+|---|---|
+| Steer Left / Steer Right | Steer while held (eases to full lock in about half a second) |
+| Steering Angle | Steer with the handlebar angle (30 degrees = full lock) |
+| Brake | Brake while held (analog levers brake partly). Pedalling stops driving the vehicle; once stopped the handbrake latches as usual |
+| Shift Up / Increase Difficulty | Hills harder: `--grade-scale` +0.1 for this run (shown in the panel's grade) |
+| Shift Down / Decrease Difficulty | Hills easier: `--grade-scale` -0.1 |
+| Lap | Zero the trip distance |
+
+Each press does one thing, even if the controller sends several buttons for it at once. While the controller steers, the keyboard does not; let the controller go back to centre and the keyboard steers again. The bike and the controller share the Bluetooth adapter, which is normally fine.
+
 ---
 
 ## 6. Options
@@ -182,6 +198,7 @@ Set these in the start scripts. They are the same on both systems.
 | `--hold SECONDS` | `15` | Ignore the game for this long after you turn the bike's dial by hand |
 | `--ramp-up` / `--ramp-down` | `4` / `8` | Max resistance change per half second |
 | `--port N` | `48765` | Must match the link |
+| `--obc auto\|ADDR\|IP:PORT` | off | Also connect an OpenBikeControl handlebar controller (see 5.1) |
 | `--no-log` | off | Do not write a ride CSV |
 
 **Port already in use?** If the bridge fails with `only one usage of each socket address`, another program is using 48765. Change `PORT` in **both** start scripts to something else, for example `48766`.
