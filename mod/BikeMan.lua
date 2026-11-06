@@ -1,6 +1,7 @@
 -- BikeMan v0.3: links FS25 to an external smart-bike bridge using small files under modSettings/FS25_BikeMan/.
 --   out.txt (game -> bridge, ~10 Hz): seq,speed_kmh,pitch_pct,terrain_pct,inVehicle,vehicleXml,cruiseState,cruiseKmh,engaged
 --   in.xml  (bridge -> game):         <in seq="N" kph="25.0" rpm="70" watts="120"/>
+--   optional steer="-1..1" (- = left) and lever="0..1" (brake) from a handlebar controller; 0 = leave it to the player.
 -- While in.xml keeps changing (fresh) the vehicle's speed is held to `kph` via cruise control; kph <= 1 brakes to a stop.
 -- If in.xml goes stale (bridge not running) the mod lets go and the game drives normally.
 BikeMan = {}
@@ -16,6 +17,10 @@ BikeMan.reported = {}
 BikeMan.odoResets = 0    -- counts presses of the trip-reset key; the link zeroes its trip distance whenever this changes
 BikeMan.resetKeyDown = false
 BikeMan.resetFlash = 0   -- ms left to show "TRIP RESET" on the panel
+BikeMan.STEER_MS = 600   -- ms for controller steering to swing from straight to full lock
+BikeMan.steer = 0        -- handlebar controller: wanted steering (-1 left .. 1 right) and brake (0..1)
+BikeMan.lever = 0
+BikeMan.side = 0         -- controller steering actually applied, eased toward BikeMan.steer
 
 local function log(msg) print("[BikeMan] " .. tostring(msg)) end
 local function once(key, msg) if not BikeMan.reported[key] then BikeMan.reported[key] = true; log(msg) end end
@@ -64,12 +69,16 @@ function BikeMan:readIn()
     local brake = getXMLFloat(id, "in#brake")
     local units = getXMLString(id, "in#units")
     local dist = getXMLFloat(id, "in#dist")
+    local steer = getXMLFloat(id, "in#steer")
+    local lever = getXMLFloat(id, "in#lever")
     delete(id)
     if seq ~= nil and seq ~= self.inSeq then
         self.inSeq = seq
         self.inAge = 0
         self.target = kph or 0
         self.coastBrake = brake or 0
+        self.steer = math.max(-1, math.min(1, steer or 0))
+        self.lever = math.max(0, math.min(1, lever or 0))
         self.hud = {rpm = rpm or 0, watts = watts or 0, grade = grade or 0, kj = kj or 0, scale = scale or 1.0, units = units or "both", dist = dist or 0}
     end
 end
@@ -99,11 +108,22 @@ function BikeMan:hasImplement(v)          -- true when something (plow, trailer.
     return ok and type(list) == "table" and #list > 0
 end
 
+-- Controller steering replaces the player's (axisSide < 0 = left) while it is off centre, eased so a button press
+-- does not snap the wheels to full lock. Centred (or bridge gone) the keyboard / wheel steers as normal.
+function BikeMan:steerInput(axisSide, dt)
+    local want = self.target ~= nil and self.steer or 0
+    local step = (dt or 0) / self.STEER_MS
+    self.side = self.side + math.max(-step, math.min(step, want - self.side))
+    if want == 0 and self.side == 0 then return axisSide end
+    return self.side
+end
+
 function BikeMan:wrap(v)
     if v.bikeManWrapped then return end
     v.bikeManWrapped = true
     local orig = v.updateVehiclePhysics
     v.updateVehiclePhysics = function(self, axisForward, axisSide, doHandbrake, dt)
+        axisSide = BikeMan:steerInput(axisSide, dt)
         if type(doHandbrake) ~= "boolean" then
             once("sig", "updateVehiclePhysics unexpected signature, handbrake unavailable")
         elseif not BikeMan.latched and BikeMan.armed and BikeMan.target ~= nil and BikeMan.target <= 1.0
@@ -133,6 +153,10 @@ function BikeMan:wrap(v)
                 BikeMan:freeze(self)
                 return orig(self, 0, axisSide, true, dt)
             end
+        elseif BikeMan.target ~= nil and BikeMan.lever > 0 and not BikeMan.latched
+               and (self.movingDirection or 0) >= 0 and (self.lastSpeedReal or 0) * 3600 > 1.0 then
+            -- controller brake lever while rolling forward (the link has stopped pedalling from driving us); once stopped the handbrake latches
+            return orig(self, -BikeMan.lever, axisSide, doHandbrake, dt)
         elseif BikeMan.target ~= nil and BikeMan.target <= 1.0 and (BikeMan.coastBrake or 0) > 0 and not BikeMan.latched
                and (self.movingDirection or 0) >= 0 and (self.lastSpeedReal or 0) * 3600 > 1.0 and (axisForward or 0) <= 0.05
                and BikeMan:hasImplement(self) then
@@ -158,6 +182,7 @@ function BikeMan:apply(v)
         return
     end
     local ok, err = pcall(function()
+        self:wrap(v)                              -- also while pedalling, for controller steering
         local speed = v.getLastSpeed ~= nil and v:getLastSpeed() or 0
         if speed > 1.5 then self.armed = true end
         if self.target > 1.0 then
@@ -170,7 +195,6 @@ function BikeMan:apply(v)
             end
         else
             self:release(v, "freewheel")
-            self:wrap(v)
             if not self.latched and self.armed and speed < 1.0 then
                 self.latched = true
                 log(string.format("handbrake latched (stopped) speed=%.2f", speed))

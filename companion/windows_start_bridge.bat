@@ -7,9 +7,12 @@ rem Port used between the two scripts. Change BOTH .bat files if you change it.
 set "PORT=48765"
 rem Highest resistance the game may command (hard max 80). Lower = easier.
 set "CAP=50"
+rem OpenBikeControl handlebar controller: auto to find it, or its Bluetooth address / IP:port. Blank = none.
+set "OBC="
 rem ------------------------------------------------------------------------
 set "ARGS=--cap %CAP% --port %PORT%"
 if defined BIKE_ADDR set "ARGS=%ARGS% --addr %BIKE_ADDR%"
+if defined OBC set "ARGS=%ARGS% --obc %OBC%"
 py -m pip install --quiet bleak
 echo Starting the bike bridge. Wake the bike by pedalling. Close the Renpho app and Zwift first.
 py bridge.py %ARGS%

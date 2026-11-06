@@ -33,6 +33,7 @@ def main():
     ap.add_argument("--port", type=int, default=48765)
     ap.add_argument("--cap", type=int, default=50, help="highest resistance the game may command (hard max 80)")
     ap.add_argument("--addr", default="", help="bike Bluetooth address; blank = find it automatically")
+    ap.add_argument("--obc", default="", help="OpenBikeControl handlebar controller: auto, its Bluetooth address or IP:port; blank = none")
     ap.add_argument("--bridge-python", default=sys.executable, help="Python that has bleak installed")
     ap.add_argument("--wait", type=float, default=90, help="seconds to wait for the bike")
     a, link_args = ap.parse_known_args()
@@ -43,6 +44,8 @@ def main():
     cmd = [a.bridge_python, "-u", "bridge.py", "--cap", str(a.cap), "--port", str(a.port)]
     if a.addr:
         cmd += ["--addr", a.addr]
+    if a.obc:
+        cmd += ["--obc", a.obc]
     print("Starting the bike bridge. Wake the bike by pedalling. Close the Renpho app and Zwift first.")
     rc = 1
     with open(log_path, "w") as log:

@@ -10,6 +10,9 @@ Bridge -> client, about once a second:
   {"type":"data","t":354.2,"rpm":74.0,"watts":103,"res":27,"dial":13.5,"kj":12.4,
    "target":30,"override":false,"cap":40}
   (also {"type":"hello",...} on connect and {"type":"status","bike":true/false})
+  With --obc (a handlebar controller, see obc.py):
+  {"type":"obc","steer":-0.4,"brake":0.0}   whenever steering or braking changes (-1 left .. 1 right, 0..1)
+  {"type":"obc","action":"grade_up"}        one per button press: grade_up, grade_down or trip_reset
 
 Client -> bridge:
   {"res": 30}          set resistance (0-80 scale, clamped to --cap, ramped gradually)
@@ -34,6 +37,8 @@ import time
 from datetime import datetime
 
 from bleak import BleakClient, BleakScanner
+
+import obc
 
 ADDR_DEFAULT = None  # find the bike by scanning; override with --addr
 PORT_DEFAULT = 48765
@@ -107,6 +112,9 @@ class Bridge:
         self.writers = set()
         self.no_client_since = time.time()
         self.cmd_lock = asyncio.Lock()
+        self.scan_lock = asyncio.Lock()   # one Bluetooth scan at a time (bike and controller)
+        self.obc = obc.Mapper()
+        self.obc_state = self.obc.state()
         self.csv_file = None
         self.csv = None
         self.ev = None
@@ -275,7 +283,8 @@ class Bridge:
     async def find_bike(self):
         """Scan for a bike advertising FTMS; with several, take the strongest signal."""
         print("Looking for a bike (wake it by pedalling) ...")
-        found = await BleakScanner.discover(timeout=8, return_adv=True)
+        async with self.scan_lock:
+            found = await BleakScanner.discover(timeout=8, return_adv=True)
         bikes = [(adv.rssi or -999, dev.address, dev.name or adv.local_name or "(no name)")
                  for dev, adv in found.values()
                  if FTMS in [u.lower() for u in (adv.service_uuids or [])]]
@@ -323,6 +332,87 @@ class Bridge:
             self.has_control = False
             self.commanded = None
             self.broadcast({"type": "status", "bike": False})
+            await asyncio.sleep(3)
+
+    # ---- handlebar controller (OpenBikeControl) -------------------------
+    def on_obc(self, data):
+        for action in self.obc.handle(data):
+            print(f"Controller: {action}")
+            self.broadcast({"type": "obc", "action": action})
+        self.send_obc_state()
+
+    def send_obc_state(self):
+        st = self.obc.state()
+        if st != self.obc_state:
+            self.obc_state = st
+            self.broadcast(dict({"type": "obc"}, **st))
+
+    async def find_obc(self):
+        """Scan for a controller advertising the OBC service; with several, take the strongest signal."""
+        async with self.scan_lock:
+            found = await BleakScanner.discover(timeout=6, return_adv=True)
+        ctrls = [(adv.rssi or -999, dev.address, dev.name or adv.local_name or "(no name)")
+                 for dev, adv in found.values()
+                 if obc.SERVICE in [u.lower() for u in (adv.service_uuids or [])]]
+        if not ctrls:
+            return None
+        ctrls.sort(reverse=True)
+        print(f"Found controller {ctrls[0][2]} at {ctrls[0][1]}")
+        return ctrls[0][1]
+
+    async def obc_ble(self, addr):
+        gone = asyncio.Event()
+        async with BleakClient(addr, disconnected_callback=lambda _c: gone.set()) as c:
+            await c.start_notify(obc.BUTTONS, lambda _, raw: self.on_obc(raw))
+            try:
+                await c.write_gatt_char(obc.APP_INFO, obc.app_info(), response=False)
+            except Exception as e:
+                print(f"Controller did not take the app info ({e}); buttons still work.")
+            print("Controller connected.")
+            while not gone.is_set():
+                await asyncio.sleep(0.5)
+
+    async def obc_tcp(self, host, port):
+        reader, writer = await asyncio.wait_for(asyncio.open_connection(host, port), timeout=10)
+        try:
+            writer.write(obc.app_info())
+            await writer.drain()
+            print("Controller connected.")
+            while True:
+                data = await reader.read(256)
+                if not data:
+                    break
+                for msg in obc.split_tcp(data):
+                    self.on_obc(msg)
+        finally:
+            writer.close()
+
+    async def obc_loop(self, kind, where):
+        """Keeps one controller connected (reconnects); steering and braking let go whenever it drops."""
+        addr, told = where, False
+        while True:
+            try:
+                if kind == "tcp":
+                    print(f"Connecting to controller {where[0]}:{where[1]} ...")
+                    await self.obc_tcp(*where)
+                else:
+                    if not addr:
+                        if not told:
+                            print("Looking for a handlebar controller (OpenBikeControl) ...")
+                            told = True
+                        addr = await self.find_obc()
+                        if not addr:
+                            await asyncio.sleep(5)
+                            continue
+                    print(f"Connecting to controller {addr} ...")
+                    await self.obc_ble(addr)
+            except Exception as e:
+                print(f"Controller connection problem: {e}")
+            print("Controller disconnected.")
+            self.obc.release_all()
+            self.send_obc_state()
+            if kind == "ble" and not where:
+                addr, told = None, False    # scanning: pick it up again wherever it shows up
             await asyncio.sleep(3)
 
     async def ramp_loop(self):
@@ -408,6 +498,8 @@ class Bridge:
         self.writers.add(writer)
         hello = {"type": "hello", "cap": self.a.cap, "max": MAX_RES, "bike": self.bike_ok}
         writer.write((json.dumps(hello) + "\n").encode())
+        if self.a.obc is not None:
+            writer.write((json.dumps(dict({"type": "obc"}, **self.obc_state)) + "\n").encode())
         try:
             while True:
                 line = await reader.readline()
@@ -442,6 +534,8 @@ async def run(args):
     server = await asyncio.start_server(b.handle_client, "127.0.0.1", args.port)
     print(f"Bridge listening on 127.0.0.1:{args.port}   cap res {args.cap}, safe res {args.safe}. Ctrl+C to stop.")
     tasks = [asyncio.create_task(b.bike_loop()), asyncio.create_task(b.ramp_loop()), asyncio.create_task(b.grade_loop())]
+    if args.obc is not None:
+        tasks.append(asyncio.create_task(b.obc_loop(*args.obc_target)))
     try:
         async with server:
             await server.serve_forever()
@@ -463,7 +557,14 @@ def main():
     p.add_argument("--no-log", action="store_true", help="don't write a CSV of the ride")
     p.add_argument("--vendor", action="store_true",
                    help="also listen to the bike's 5 Hz vendor stream (experimental: the bike stopped obeying load commands with it on)")
+    p.add_argument("--obc", nargs="?", const="auto", default=None, metavar="auto|ADDR|IP:PORT",
+                   help="also connect an OpenBikeControl handlebar controller (steer, brake, hill feel); see obc.py")
     args = p.parse_args()
+    if args.obc is not None:
+        try:
+            args.obc_target = obc.parse_target(args.obc)
+        except ValueError as e:
+            p.error(str(e))
     args.cap = max(0, min(MAX_RES, args.cap))
     args.safe = max(0, min(args.cap, args.safe))
     try:

@@ -10,6 +10,7 @@ Goal: ride a Renpho RQ002 smart bike (Bluetooth FTMS) inside Farming Simulator 2
 - `fs25_link.py`: stdlib only. Reads the game's `out.txt`, sends grade to the bridge, writes `in.xml` (target km/h, HUD data, trip distance) for the mod. Auto-finds the FS25 profile; override with `--profile`.
 - `FS25_BikeMan.zip`: the FS25 mod (Lua, v0.2). Keep it ZIPPED. It exchanges small files in `modSettings/FS25_BikeMan/`. The game's Lua cannot read files with io, only write; it reads through `loadXMLFile` (in.xml).
 - `find_bike.py`: lists nearby BLE devices, marking FTMS ones with `*`.
+- `obc.py`: optional OpenBikeControl handlebar controller for the bridge (`--obc`). Steering and braking reach the mod as `steer`/`lever` in `in.xml`; Shift Up/Down change the link's grade scale; Lap zeroes the trip. One action per press (see `PRIORITY`). Not verified in the game yet.
 - Start scripts: `windows_*.bat`, `linux_start_bridge.sh`, `linux_start_link.sh`, `find_bike.sh`. **The `.sh` files are NEW and have never been run on Linux.** They were written on Windows. Check line endings (must be LF), `chmod +x`, and that the `.venv` approach works on Bazzite.
 
 ## What was verified on Windows (do not redo)
